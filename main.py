@@ -20,7 +20,7 @@ from selenium.webdriver.remote.webelement import WebElement
 
 import retrying
 
-from utils import make_output_dir
+from utils import make_output_dir, parse_m3u8
 from dotenv import load_dotenv
 
 # Logger
@@ -174,6 +174,17 @@ class Scraping:
                 )
 
             playButton.click()
+        except ElementClickInterceptedException:
+            logger.warning("ElementClickInterceptedException: Removing modal")
+            try:
+                modal_close_button = self.driver.find_element(
+                    By.ID, "tooltipClose_wp136g6s"
+                )
+
+                modal_close_button.click()
+                playButton.click()
+            except NoSuchElementException:
+                logger.warning("Modal close button not found")
         except NoSuchElementException:
             logger.warning("Play button not found")
             time.sleep(100)
@@ -186,11 +197,17 @@ class Scraping:
         self.click_play_button()
 
         # for for networks
-        request = self.driver.wait_for_request(
-            r"https://manifest\.prod\.boltdns\.net/.*/master\.m3u8"
-        )
+        print("trying to find master m3u8 request")
+        request = None
+        for req in self.driver.requests:
+            if req.response and "master.m3u8" in req.url:
+                request = req
+        if not request:
+            raise Exception("No master.m3u8 request found")
 
         print(f"found request: {request.url}")
+
+        parse_m3u8(request.url)
 
     def save_course_links(self):
         with open(
