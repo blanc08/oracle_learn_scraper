@@ -22,6 +22,7 @@ import retrying
 
 from utils import make_output_dir, parse_m3u8
 from dotenv import load_dotenv
+import argparse
 
 # Logger
 logging.basicConfig(level=logging.WARNING)
@@ -29,18 +30,25 @@ logger = logging.getLogger(__name__)
 
 
 class Scraping:
-    def __init__(self, web_driver: webdriver.Chrome, labels: list):
+    def __init__(self, web_driver: webdriver.Chrome, base_url):
         # Prepare output dir in case not exist
         make_output_dir()
 
         self.driver = web_driver
-        self.base_url = "https://mylearn.oracle.com/ou/learning-path/become-a-certified-order-management-order-to-cash-implementer/97141"
-        self.labels = labels
+        self.base_url = base_url
         self.items = []
         self.course_links = []
         self.csv_base_path = os.path.join(os.path.curdir, "output/csv")
 
         self.authentication()
+
+    def prepase_output_directories(self):
+        """
+        Preparing output directories if not exist
+        """
+        os.makedirs("output/csv", exist_ok=True)
+        os.makedirs("output/m3u8", exist_ok=True)
+        os.makedirs("output/videos", exist_ok=True)
 
     # Authenticator
     def authentication(self):
@@ -227,28 +235,20 @@ class Scraping:
 
 if __name__ == "__main__":
 
+    # Argument parser
+    parser = argparse.ArgumentParser(description="Oracle Learn Scraper")
+    parser.add_argument("base_url", type=str, help="Base URL to start scraping from")
+    args = parser.parse_args()
+
     # Web Driver
     logger.info("Initializing Web Driver")
     options = webdriver.ChromeOptions()
     web_driver = webdriver.Chrome()
 
-    labels = [
-        "Name",
-        "Code",
-        "Dimensional Url",
-        "Height",
-        "Length",
-        "Width",
-        "Extension",
-        "Backplate",
-        "Socket",
-        "Wattage",
-        "Weight",
-    ]
+    # Initialize Scraping with base_url from arguments
+    scraper = Scraping(web_driver=web_driver, base_url=args.base_url)
 
-    parser = Scraping(web_driver=web_driver, labels=labels)
-
-    items = parser.parse()
+    items = scraper.parse()
 
     # debug || offs
     web_driver.quit()

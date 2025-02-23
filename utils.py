@@ -52,7 +52,9 @@ def parse_m3u8(paylist_url: str):
     # Download the video using ffmpeg
     random_string = str(uuid.uuid4())
     output_filename = f"output/videos/{random_string}.mp4"
-    system(f'ffmpeg -i "{paylist_url}" -c copy {output_filename}')
+    system(
+        f'ffmpeg -i "{paylist_url}" -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k "{output_filename}"'
+    )
 
     # if you want to write a file from its content
     random_string = str(uuid.uuid4())
