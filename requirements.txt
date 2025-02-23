@@ -1,0 +1,7 @@
+beautifulsoup4
+selenium-wire
+selenium
+retrying
+python-dotenv
+m3u8
+ffmpeg
