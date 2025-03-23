@@ -295,53 +295,44 @@ class Scraping:
 
         time.sleep(5)
 
-    def retry_if_element_not_interactable(exception):
-        """
-        Returns True if we should retry on ElementNotInteractableException, False otherwise.
-        """
-        logger.warning("retrying play button")
-        return isinstance(
-            exception,
-            (
-                ElementNotInteractableException,
-                ElementClickInterceptedException,
-                StaleElementReferenceException,
-                NoSuchElementException,
-            ),
-        )
-
-    @retrying.retry(
-        stop_max_delay=5000,
-        stop_max_attempt_number=5,
-        retry_on_exception=retry_if_element_not_interactable,
-    )
     def click_play_button(self):
         logger.warning("clicking play button")
 
         self.driver.implicitly_wait(20)
-        try:
+        attempts = 0
+        max_attempts = 5
+        while attempts < max_attempts:
             try:
-                playButton = self.driver.find_element(By.ID, "playerIdbtn")
-            except NoSuchElementException:
-                playButton = self.driver.find_element(
-                    By.CLASS_NAME, "vjs-big-play-button"
-                )
+                try:
+                    playButton = self.driver.find_element(By.ID, "playerIdbtn")
+                except NoSuchElementException:
+                    playButton = self.driver.find_element(
+                        By.CLASS_NAME, "vjs-big-play-button"
+                    )
 
-            playButton.click()
-        except ElementClickInterceptedException:
-            logger.warning("ElementClickInterceptedException: Removing modal")
-            try:
-                modal_close_button = self.driver.find_element(
-                    By.ID, "tooltipClose_wp136g6s"
-                )
-
-                modal_close_button.click()
                 playButton.click()
-            except NoSuchElementException:
-                logger.warning("Modal close button not found")
-        except NoSuchElementException:
-            logger.warning("Play button not found")
-            time.sleep(100)
+                return  # Exit the function if click is successful
+            except (
+                ElementClickInterceptedException,
+                ElementNotInteractableException,
+                StaleElementReferenceException,
+                NoSuchElementException,
+            ) as e:
+                logger.warning(f"Attempt {attempts + 1} failed: {str(e)}")
+                attempts += 1
+                time.sleep(1)  # Wait before retrying
+
+                if isinstance(e, ElementClickInterceptedException):
+                    logger.warning("ElementClickInterceptedException: Removing modal")
+                    try:
+                        modal_close_button = self.driver.find_element(
+                            By.ID, "tooltipClose_wp136g6s"
+                        )
+                        modal_close_button.click()
+                    except NoSuchElementException:
+                        logger.warning("Modal close button not found")
+
+        logger.error("Failed to click play button after multiple attempts")
 
     def parse_video(self, href: str):
         logger.warning(f"parsing video: {href}")
