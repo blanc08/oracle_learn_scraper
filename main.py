@@ -35,6 +35,64 @@ logger = logging.getLogger(__name__)
 
 
 class Scraping:
+    def handle_error(self, exception, context=None):
+        """
+        Unified error handler: logs error, saves screenshot, HTML, and optionally network info.
+        Args:
+            exception (Exception): The exception instance.
+            context (str, optional): Context string, e.g., 'network'.
+        """
+        import traceback
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_path = os.path.join("output", "debug", timestamp)
+        os.makedirs(base_path, exist_ok=True)
+
+        # Save screenshot
+        screenshot_path = os.path.join(base_path, "screenshot.png")
+        try:
+            self.driver.save_screenshot(screenshot_path)
+            logger.error(f"Saved screenshot: {screenshot_path}")
+        except Exception as e:
+            logger.error(f"Failed to save screenshot: {e}")
+
+        # Save HTML DOM
+        html_path = os.path.join(base_path, "page.html")
+        try:
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(self.driver.page_source)
+            logger.error(f"Saved HTML DOM: {html_path}")
+        except Exception as e:
+            logger.error(f"Failed to save HTML DOM: {e}")
+
+        # Save network info if context is network and seleniumwire is available
+        if context == "network":
+            network_path = os.path.join(base_path, "network.txt")
+            try:
+                with open(network_path, "w", encoding="utf-8") as f:
+                    for req in getattr(self.driver, "requests", []):
+                        f.write(
+                            f"{req.method} {req.url} -> {getattr(req.response, 'status_code', 'N/A')}\n"
+                        )
+                logger.error(f"Saved network info: {network_path}")
+            except Exception as e:
+                logger.error(f"Failed to save network info: {e}")
+
+        # Save stack trace and error info
+        error_path = os.path.join(base_path, "error.log")
+        try:
+            with open(error_path, "w", encoding="utf-8") as f:
+                f.write(f"Exception: {str(exception)}\n")
+                f.write(traceback.format_exc())
+            logger.error(f"Saved error log: {error_path}")
+        except Exception as e:
+            logger.error(f"Failed to save error log: {e}")
+
+        logger.error(
+            f"Unified error handler triggered. See debug artifacts in {base_path}"
+        )
+
     def __init__(self, web_driver: webdriver.Chrome, base_url):
         # Prepare output dir in case not exist
         make_output_dir()
@@ -244,8 +302,7 @@ class Scraping:
                 self.driver.save_screenshot("output/screenshots/login_failed.png")
 
         except Exception as e:
-            logger.error(f"Authentication error: {str(e)}")
-            self.driver.save_screenshot("output/screenshots/login_error.png")
+            self.handle_error(e)
             raise
 
     def parse(self):
@@ -279,7 +336,10 @@ class Scraping:
 
         for course_url in self.course_links:
             logger.info(f"parsing {course_url}")
-            self.parse_course_page(course_url)
+            try:
+                self.parse_course_page(course_url)
+            except Exception as e:
+                self.handle_error(e)
 
         return self.items
 
@@ -290,19 +350,28 @@ class Scraping:
             return ""
 
     def parse_course_page(self, url: str):
-        self.driver.get(url)
-        playlist_dom = self.driver.find_element(by=By.ID, value="playlist-tab-panel")
+        try:
+            self.driver.get(url)
+            playlist_dom = self.driver.find_element(
+                by=By.ID, value="playlist-tab-panel"
+            )
 
-        videos = playlist_dom.find_elements(by=By.TAG_NAME, value="a")
-        for video in videos:
-            href = self.parse_video_url(video)
-            if href:
-                self.parse_video(href)
-            else:
-                # kemungkinan icon dropdown bawah gitu kalo di web-nya
-                logger.info(f"No href attribute found for this video. Text: {video}")
+            videos = playlist_dom.find_elements(by=By.TAG_NAME, value="a")
+            for video in videos:
+                href = self.parse_video_url(video)
+                if href:
+                    try:
+                        self.parse_video(href)
+                    except Exception as e:
+                        self.handle_error(e, context="network")
+                else:
+                    logger.info(
+                        f"No href attribute found for this video. Text: {video}"
+                    )
 
-        time.sleep(5)
+            time.sleep(5)
+        except Exception as e:
+            self.handle_error(e)
 
     def click_play_button(self):
         logger.warning("clicking play button")
@@ -345,23 +414,25 @@ class Scraping:
 
     def parse_video(self, href: str):
         logger.warning(f"parsing video: {href}")
+        try:
+            self.driver.get(href)
+            self.driver.implicitly_wait(10)
+            self.click_play_button()
 
-        self.driver.get(href)
-        self.driver.implicitly_wait(10)
-        self.click_play_button()
+            # for for networks
+            print("trying to find master m3u8 request")
+            request = None
+            for req in self.driver.requests:
+                if req.response and "master.m3u8" in req.url:
+                    request = req
+            if not request:
+                raise Exception("No master.m3u8 request found")
 
-        # for for networks
-        print("trying to find master m3u8 request")
-        request = None
-        for req in self.driver.requests:
-            if req.response and "master.m3u8" in req.url:
-                request = req
-        if not request:
-            raise Exception("No master.m3u8 request found")
+            print(f"found request: {request.url}")
 
-        print(f"found request: {request.url}")
-
-        parse_m3u8(request.url)
+            parse_m3u8(request.url)
+        except Exception as e:
+            self.handle_error(e, context="network")
 
     def save_course_links(self):
         with open(
@@ -401,8 +472,11 @@ if __name__ == "__main__":
 
         items = scraper.parse()
     except Exception as e:
-        logger.error(f"Error during scraping: {str(e)}")
-        web_driver.save_screenshot("output/screenshots/error.png")
+        if "scraper" in locals():
+            scraper.handle_error(e)
+        else:
+            logger.error(f"Error during scraping: {str(e)}")
+            web_driver.save_screenshot("output/screenshots/error.png")
     finally:
         # Always close the driver
         web_driver.quit()
