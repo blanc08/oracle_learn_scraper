@@ -47,12 +47,13 @@ class Scraping:
         )
         logger.warning(f"Body class: {body_class}")
         if " oj-component-modal-open" in body_class:
-            logger.warning("Detected modal open state. Attempting to close it.")
+            logger.warning("Detected modal open state. Attempting to login.")
             try:
                 login_button = self.driver.find_element(
                     By.CLASS_NAME, "oj-button-button"
                 )
                 login_button.click()
+                logger.warning("Clicked login button")
             except NoSuchElementException:
                 logger.warning("Login button not found")
 
@@ -337,7 +338,7 @@ class Scraping:
         Parse an items for given Oracle learn's Path
         """
 
-        logger.info(f"Processing Oracle Path: {self.base_url}")
+        logger.warning(f"Processing Oracle Path: {self.base_url}")
         self.driver.get(self.base_url)
 
         wait_chapters = WebDriverWait(self.driver, 60)
@@ -346,7 +347,7 @@ class Scraping:
         )
 
         self.driver.implicitly_wait(10)
-        logger.info("Chapters visible")
+        logger.warning("Chapters visible")
 
         # Get the page source and parse it with BeautifulSoup
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
@@ -362,7 +363,7 @@ class Scraping:
         self.save_course_links()
 
         for course_url in self.course_links:
-            logger.info(f"parsing {course_url}")
+            logger.warning(f"parsing {course_url}")
             try:
                 self.parse_course_page(course_url)
             except Exception as e:
@@ -370,43 +371,37 @@ class Scraping:
 
         return self.items
 
-    def parse_video_url(self, video: WebElement):
-        try:
-            return video.get_attribute("href")
-        except StaleElementReferenceException as e:
-            return ""
-
     def parse_course_page(self, url: str):
         try:
-            logger.info(f"Processing Oracle Course: {url}")
+            logger.warning(f"Processing Oracle Course: {url}")
             self.driver.get(url)
             self.check_and_relogin()
 
-            # Wait up to 3 seconds for the playlist-tab-panel to appear
-            wait = WebDriverWait(self.driver, 3)
+            # Debug logging before waiting for playlist-tab-panel
+            logger.warning(f"Current URL before waiting: {self.driver.current_url}")
+            logger.warning(f"Page title before waiting: {self.driver.title}")
+
+            # Wait up to 10 seconds for the playlist-tab-panel to appear
+            wait = WebDriverWait(self.driver, 10)
             playlist_dom = wait.until(
                 EC.presence_of_element_located((By.ID, "playlist-tab-panel"))
             )
 
             videos = playlist_dom.find_elements(by=By.TAG_NAME, value="a")
             for video in videos:
-                href = self.parse_video_url(video)
-                if href:
-                    try:
-                        self.parse_video(href)
-                    except Exception as e:
-                        self.handle_error(e, context="network")
-                else:
-                    logger.info(
-                        f"No href attribute found for this video. Text: {video}"
-                    )
+                href = video.get_attribute("href") or ""
+                if href == "":
+                    raise ValueError("Video element does not have a valid href")
+
+                self.parse_video(href)
 
             time.sleep(5)
         except Exception as e:
             self.handle_error(e)
+            raise RuntimeError("Failed to parse course page")
 
     def click_play_button(self):
-        logger.info("clicking play button")
+        logger.warning("clicking play button")
         # Play Button for unauthenticated user
         # #playerIdbtn > button
 
@@ -456,7 +451,7 @@ class Scraping:
             parse_m3u8(request.url)
         except Exception as e:
             logger.error(f"Error parsing video {href}: {str(e)}")
-            self.handle_error(e, context="network")
+            raise RuntimeError("Failed to parse video")
 
     def save_course_links(self):
         with open(
@@ -482,7 +477,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Web Driver
-    logger.info("Initializing Web Driver")
+    logger.warning("Initializing Web Driver")
     options = webdriver.ChromeOptions()
     options.add_argument("--window-size=1920,1080")  # Add specific window size
     options.add_argument("--disable-gpu")  # Disable GPU acceleration
