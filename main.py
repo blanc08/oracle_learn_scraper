@@ -49,9 +49,10 @@ class Scraping:
         base_path = os.path.join("output", "debug", timestamp)
         os.makedirs(base_path, exist_ok=True)
 
-        # Save screenshot
+        # Save screenshot (add delay to allow page to finish loading)
         screenshot_path = os.path.join(base_path, "screenshot.png")
         try:
+            time.sleep(3)  # Wait for 3 seconds before taking screenshot
             self.driver.save_screenshot(screenshot_path)
             logger.error(f"Saved screenshot: {screenshot_path}")
         except Exception as e:
@@ -252,6 +253,10 @@ class Scraping:
                 )
 
             password = os.getenv("PASSWORD")
+            if password is None:
+                logger.warning("PASSWORD environment variable is not set")
+                raise ValueError("PASSWORD environment variable is not set")
+
             password_field.clear()
             password_field.send_keys(password)
             logger.warning("Entered password")
@@ -352,8 +357,11 @@ class Scraping:
     def parse_course_page(self, url: str):
         try:
             self.driver.get(url)
-            playlist_dom = self.driver.find_element(
-                by=By.ID, value="playlist-tab-panel"
+
+            # Wait up to 3 seconds for the playlist-tab-panel to appear
+            wait = WebDriverWait(self.driver, 3)
+            playlist_dom = wait.until(
+                EC.presence_of_element_located((By.ID, "playlist-tab-panel"))
             )
 
             videos = playlist_dom.find_elements(by=By.TAG_NAME, value="a")
@@ -466,10 +474,8 @@ if __name__ == "__main__":
     options.add_argument("--no-sandbox")  # Disable sandbox mode
     web_driver = webdriver.Chrome(options=options)
 
+    scraper = Scraping(web_driver=web_driver, base_url=args.base_url)
     try:
-        # Initialize Scraping with base_url from arguments
-        scraper = Scraping(web_driver=web_driver, base_url=args.base_url)
-
         items = scraper.parse()
     except Exception as e:
         if "scraper" in locals():

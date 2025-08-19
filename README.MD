@@ -5,7 +5,7 @@
 pip install -q -r requirements.txt
 ```
 
-# Running script
+## Running script
 
 ```bash
 python main.py <base_url>
