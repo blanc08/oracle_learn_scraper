@@ -54,6 +54,7 @@ class Scraping:
         os.makedirs("output/csv", exist_ok=True)
         os.makedirs("output/m3u8", exist_ok=True)
         os.makedirs("output/videos", exist_ok=True)
+        os.makedirs("output/screenshots", exist_ok=True)
 
     @retrying.retry(
         stop_max_attempt_number=3,
@@ -77,7 +78,7 @@ class Scraping:
         logger.warning(f"Current URL: {self.driver.current_url}")
 
         # Take a screenshot for debugging (optional)
-        self.driver.save_screenshot("login_page.png")
+        self.driver.save_screenshot("output/screenshots/login_page.png")
         logger.warning("Saved screenshot as login_page.png")
 
         # Use explicit wait instead of implicit
@@ -240,11 +241,11 @@ class Scraping:
                 logger.warning(
                     f"Login might have failed. Current URL: {self.driver.current_url}"
                 )
-                self.driver.save_screenshot("login_failed.png")
+                self.driver.save_screenshot("output/screenshots/login_failed.png")
 
         except Exception as e:
             logger.error(f"Authentication error: {str(e)}")
-            self.driver.save_screenshot("login_error.png")
+            self.driver.save_screenshot("output/screenshots/login_error.png")
             raise
 
     def parse(self):
@@ -401,7 +402,7 @@ if __name__ == "__main__":
         items = scraper.parse()
     except Exception as e:
         logger.error(f"Error during scraping: {str(e)}")
-        web_driver.save_screenshot("error.png")
+        web_driver.save_screenshot("output/screenshots/error.png")
     finally:
         # Always close the driver
         web_driver.quit()
