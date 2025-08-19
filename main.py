@@ -3,6 +3,10 @@ import logging
 import os
 import time
 from urllib.parse import urljoin
+import warnings
+
+# Suppress the pkg_resources deprecation warning from seleniumwire
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API.*")
 
 # Web Scraping libraries
 from bs4 import BeautifulSoup
@@ -112,6 +116,10 @@ class Scraping:
 
             load_dotenv()
             username = os.getenv("EMAIL")
+            if username is None:
+                logger.error("No username found in environment variables")
+                raise ValueError("No username found in environment variables")
+
             username_field.clear()
             username_field.send_keys(username)
             logger.warning(f"Entered username: {username}")
