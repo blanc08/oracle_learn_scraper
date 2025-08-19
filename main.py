@@ -35,6 +35,27 @@ logger = logging.getLogger(__name__)
 
 
 class Scraping:
+    def check_and_relogin(self):
+        """
+        Check for the 'Sign in to my account' button and click it to re-login if found.
+        """
+        logger.warning("checking authentication state")
+
+        # If body tag have " oj-component-modal-open" class, the we should re-login
+        body_class = (
+            self.driver.find_element(By.TAG_NAME, "body").get_attribute("class") or ""
+        )
+        logger.warning(f"Body class: {body_class}")
+        if " oj-component-modal-open" in body_class:
+            logger.warning("Detected modal open state. Attempting to close it.")
+            try:
+                login_button = self.driver.find_element(
+                    By.CLASS_NAME, "oj-button-button"
+                )
+                login_button.click()
+            except NoSuchElementException:
+                logger.warning("Login button not found")
+
     def handle_error(self, exception, context=None):
         """
         Unified error handler: logs error, saves screenshot, HTML, and optionally network info.
@@ -105,7 +126,7 @@ class Scraping:
         self.course_links = []
         self.csv_base_path = os.path.join(os.path.curdir, "output/csv")
 
-        self.authentication()
+        # self.authentication()
 
     def prepase_output_directories(self):
         """
@@ -311,12 +332,12 @@ class Scraping:
             self.handle_error(e)
             raise
 
-    def parse(self):
+    def parse_path(self):
         """
-        Parse an items for given path name
+        Parse an items for given Oracle learn's Path
         """
 
-        logger.info(f"Parsing items from path {self.base_url}")
+        logger.info(f"Processing Oracle Path: {self.base_url}")
         self.driver.get(self.base_url)
 
         wait_chapters = WebDriverWait(self.driver, 60)
@@ -357,7 +378,9 @@ class Scraping:
 
     def parse_course_page(self, url: str):
         try:
+            logger.info(f"Processing Oracle Course: {url}")
             self.driver.get(url)
+            self.check_and_relogin()
 
             # Wait up to 3 seconds for the playlist-tab-panel to appear
             wait = WebDriverWait(self.driver, 3)
@@ -383,7 +406,9 @@ class Scraping:
             self.handle_error(e)
 
     def click_play_button(self):
-        logger.warning("clicking play button")
+        logger.info("clicking play button")
+        # Play Button for unauthenticated user
+        # #playerIdbtn > button
 
         self.driver.implicitly_wait(20)
         attempts = 0
@@ -399,27 +424,12 @@ class Scraping:
 
                 playButton.click()
                 return  # Exit the function if click is successful
-            except (
-                ElementClickInterceptedException,
-                ElementNotInteractableException,
-                StaleElementReferenceException,
-                NoSuchElementException,
-            ) as e:
+            except Exception as e:
                 logger.warning(f"Attempt {attempts + 1} failed: {str(e)}")
                 attempts += 1
                 time.sleep(1)  # Wait before retrying
 
-                if isinstance(e, ElementClickInterceptedException):
-                    logger.warning("ElementClickInterceptedException: Removing modal")
-                    try:
-                        modal_close_button = self.driver.find_element(
-                            By.ID, "tooltipClose_wp136g6s"
-                        )
-                        modal_close_button.click()
-                    except NoSuchElementException:
-                        logger.warning("Modal close button not found")
-
-        logger.error("Failed to click play button after multiple attempts")
+                raise ElementNotInteractableException("Play button is not interactable")
 
     def parse_video(self, href: str):
         logger.warning(f"parsing video: {href}")
@@ -427,6 +437,10 @@ class Scraping:
             self.driver.get(href)
             self.driver.implicitly_wait(10)
             self.click_play_button()
+
+            # Check for Login Modal after clicking play button
+            # If shows up, the authentication flow needs to be handled
+            self.check_and_relogin()
 
             # for for networks
             print("trying to find master m3u8 request")
@@ -441,6 +455,7 @@ class Scraping:
 
             parse_m3u8(request.url)
         except Exception as e:
+            logger.error(f"Error parsing video {href}: {str(e)}")
             self.handle_error(e, context="network")
 
     def save_course_links(self):
@@ -477,7 +492,7 @@ if __name__ == "__main__":
 
     scraper = Scraping(web_driver=web_driver, base_url=args.base_url)
     try:
-        items = scraper.parse()
+        items = scraper.parse_path()
     except Exception as e:
         if "scraper" in locals():
             scraper.handle_error(e)

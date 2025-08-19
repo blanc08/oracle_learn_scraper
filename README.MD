@@ -16,3 +16,8 @@ example
 ```bash
 python main.py https://mylearn.oracle.com/ou/learning-path/become-a-certified-order-management-order-to-cash-implementer/97141
 ```
+
+## Oracle Course Structure
+
+1. Path
+2. Course
