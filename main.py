@@ -80,11 +80,12 @@ class Scraping:
             except Exception as e:
                 logger.error(f"Failed to save network info: {e}")
 
-        # Save stack trace and error info
+        # Save stack trace, error info, and current URL
         error_path = os.path.join(base_path, "error.log")
         try:
             with open(error_path, "w", encoding="utf-8") as f:
                 f.write(f"Exception: {str(exception)}\n")
+                f.write(f"Current URL: {getattr(self.driver, 'current_url', 'N/A')}\n")
                 f.write(traceback.format_exc())
             logger.error(f"Saved error log: {error_path}")
         except Exception as e:
