@@ -357,11 +357,7 @@ class Scraping:
         self.save_course_links()
 
         for course_url in self.course_links:
-            logger.warning(f"parsing {course_url}")
-            try:
-                self.parse_course_page(course_url)
-            except Exception as e:
-                self.handle_error(e)
+            self.parse_course_page(course_url)
 
         return self.items
 
