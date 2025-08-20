@@ -16,8 +16,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
     ElementNotInteractableException,
-    ElementClickInterceptedException,
-    StaleElementReferenceException,
     NoSuchElementException,
     TimeoutException,
 )
@@ -30,7 +28,7 @@ from dotenv import load_dotenv
 import argparse
 
 # Logger
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +74,6 @@ class Scraping:
         try:
             time.sleep(3)  # Wait for 3 seconds before taking screenshot
             self.driver.save_screenshot(screenshot_path)
-            logger.error(f"Saved screenshot: {screenshot_path}")
         except Exception as e:
             logger.error(f"Failed to save screenshot: {e}")
 
@@ -85,7 +82,6 @@ class Scraping:
         try:
             with open(html_path, "w", encoding="utf-8") as f:
                 f.write(self.driver.page_source)
-            logger.error(f"Saved HTML DOM: {html_path}")
         except Exception as e:
             logger.error(f"Failed to save HTML DOM: {e}")
 
@@ -98,7 +94,6 @@ class Scraping:
                         f.write(
                             f"{req.method} {req.url} -> {getattr(req.response, 'status_code', 'N/A')}\n"
                         )
-                logger.error(f"Saved network info: {network_path}")
             except Exception as e:
                 logger.error(f"Failed to save network info: {e}")
 
@@ -337,8 +332,7 @@ class Scraping:
         """
         Parse an items for given Oracle learn's Path
         """
-
-        logger.warning(f"Processing Oracle Path: {self.base_url}")
+        logger.info(f"[PROCESS] Processing Oracle Path: {self.base_url}")
         self.driver.get(self.base_url)
 
         wait_chapters = WebDriverWait(self.driver, 60)
@@ -373,7 +367,7 @@ class Scraping:
 
     def parse_course_page(self, url: str):
         try:
-            logger.warning(f"Processing Oracle Course: {url}")
+            logger.info(f"[PROCESS] Processing Oracle Course: {url}")
             self.driver.get(url)
             self.check_and_relogin()
 
@@ -398,7 +392,7 @@ class Scraping:
             time.sleep(5)
         except Exception as e:
             self.handle_error(e)
-            raise RuntimeError("Failed to parse course page")
+            raise e
 
     def click_play_button(self):
         logger.warning("clicking play button")
