@@ -372,13 +372,17 @@ class Scraping:
             logger.warning(f"Page title before waiting: {self.driver.title}")
 
             # Wait up to 10 seconds for the playlist-tab-panel to appear
-            wait = WebDriverWait(self.driver, 10)
+            wait = WebDriverWait(self.driver, 100)
             playlist_dom = wait.until(
                 EC.presence_of_element_located((By.ID, "playlist-tab-panel"))
             )
 
-            videos = playlist_dom.find_elements(by=By.TAG_NAME, value="a")
+            videos = playlist_dom.find_elements(
+                by=By.CLASS_NAME, value="playlist-component-href"
+            )
             for video in videos:
+                logger.info(f"Found video element: {video}")
+
                 href = video.get_attribute("href") or ""
                 if href == "":
                     raise ValueError("Video element does not have a valid href")
